@@ -528,7 +528,7 @@ def main():
   else:
     train_idxs = []
     for i in range(10):
-      with open('data/meta/subset' + args.subset + '.json', 'r') as p:
+      with open('data/meta/subset' + str(i) + '.json', 'r') as p:
         subjson = json.load(p)
       if int(args.subset) == i:
         with open('data/vals.json', 'w') as f:
