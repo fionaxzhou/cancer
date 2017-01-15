@@ -7,7 +7,7 @@ import tensorflow.contrib.slim as slim
 def model(x, H, reuse, is_training=True):
   if H['inception'] == 1:
     with slim.arg_scope(inception_v1.inception_v1_arg_scope()):
-      _, T = inception.inception_v1(x,
+      _, T = inception_v1.inception_v1(x,
                       is_training = is_training,
                       num_classes = 1001,
                       dropout_keep_prob = 0.8,
@@ -21,7 +21,7 @@ def model(x, H, reuse, is_training=True):
     early_feat_channels = 480
   elif H['inception'] == 3:
     with slim.arg_scope(inception_v3.inception_v3_arg_scope()):
-      _, T = inception.inception_v3(x,
+      _, T = inception_v3.inception_v3(x,
                       is_training = is_training,
                       num_classes = 1001,
                       dropout_keep_prob = 0.8,

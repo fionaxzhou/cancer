@@ -2,7 +2,7 @@
 # @Author: yancz1989
 # @Date:   2017-01-15 19:48:44
 # @Last Modified by:   yancz1989
-# @Last Modified time: 2017-01-15 19:48:53
+# @Last Modified time: 2017-01-15 23:19:04
 # Copyright 2016 The TensorFlow Authors. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -31,7 +31,7 @@ from __future__ import print_function
 
 import tensorflow as tf
 
-from nets import inception_utils
+from . import inception_utils
 
 slim = tf.contrib.slim
 
