@@ -70,22 +70,6 @@ def deconv(x, output_shape, channels):
   return y
 
 def rezoom(H, pred_boxes, early_feat, early_feat_channels, w_offsets, h_offsets):
-  '''
-  Rezoom into a feature map at multiple interpolation points in a grid. 
-
-  If the predicted object center is at X, len(w_offsets) == 3, and len(h_offsets) == 5,
-  the rezoom grid will look as follows:
-
-  [o o o]
-  [o o o]
-  [o X o]
-  [o o o]
-  [o o o]
-
-  Where each letter indexes into the feature map with bilinear interpolation
-  '''
-
-
   grid_size = H['grid_width'] * H['grid_height']
   outer_size = grid_size * H['batch_size']
   indices = []
@@ -113,10 +97,6 @@ def rezoom(H, pred_boxes, early_feat, early_feat_channels, w_offsets, h_offsets)
              len(w_offsets) * len(h_offsets) * early_feat_channels])
 
 def build_forward(H, x, phase, reuse):
-  '''
-  Construct the forward model
-  '''
-
   grid_size = H['grid_width'] * H['grid_height']
   outer_size = grid_size * H['batch_size']
   input_mean = 117.
@@ -143,8 +123,8 @@ def build_forward(H, x, phase, reuse):
 
   elif H['avg_pool_size'] > 1:
     pool_size = H['avg_pool_size']
-    cnn1 = cnn[:, :, :, :700]
-    cnn2 = cnn[:, :, :, 700:]
+    cnn1 = cnn[:, :, :, :400]
+    cnn2 = cnn[:, :, :, 400:]
     cnn2 = tf.nn.avg_pool(cnn2, ksize=[1, pool_size, pool_size, 1],
                 strides=[1, 1, 1, 1], padding='SAME')
     cnn = tf.concat(3, [cnn1, cnn2])
@@ -294,7 +274,6 @@ def build_forward_backward(H, x, phase, boxes, flags):
         loss += delta_boxes_loss
     else:
       loss = confidences_loss + boxes_loss
-
   return pred_boxes, pred_confidences, loss, confidences_loss, boxes_loss
 
 def build(H, q):
@@ -332,9 +311,8 @@ def build(H, q):
 
     grid_size = H['grid_width'] * H['grid_height']
 
-    (pred_boxes, pred_confidences,
-     loss[phase], confidences_loss[phase],
-     boxes_loss[phase]) = build_forward_backward(H, x, phase, boxes, flags)
+    (pred_boxes, pred_confidences, loss[phase], confidences_loss[phase],
+        boxes_loss[phase]) = build_forward_backward(H, x, phase, boxes, flags)
     pred_confidences_r = tf.reshape(pred_confidences, [H['batch_size'], grid_size, H['rnn_len'], arch['num_classes']])
     pred_boxes_r = tf.reshape(pred_boxes, [H['batch_size'], grid_size, H['rnn_len'], 4])
 
@@ -356,8 +334,7 @@ def build(H, q):
       moving_avg = tf.train.ExponentialMovingAverage(0.95)
       smooth_op = moving_avg.apply([accuracy['train'], accuracy['test'],
                       confidences_loss['train'], boxes_loss['train'],
-                      confidences_loss['test'], boxes_loss['test'],
-                      ])
+                      confidences_loss['test'], boxes_loss['test']])
 
       for p in ['train', 'test']:
         tf.scalar_summary('%s/accuracy' % p, accuracy[p])
@@ -528,13 +505,15 @@ def main():
   else:
     train_idxs = []
     for i in range(10):
-      with open('data/meta/subset' + str(i) + '.json', 'r') as p:
-        subjson = json.load(p)
       if int(args.subset) == i:
+        with open('data/meta/subset' + str(i) + '.json', 'r') as p:
+          subjson = json.load(p)
         with open('data/vals.json', 'w') as f:
           json.dump(subjson, f)
       else:
-        train_idxs += subjson
+        with open('data/meta/subset' + str(i) + '_A.json', 'r') as p:
+          subjson = json.load(p)
+          train_idxs += subjson
     with open('data/train.json', 'w') as f:
       json.dump(train_idxs, f)
 

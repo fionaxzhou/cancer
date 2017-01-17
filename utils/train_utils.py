@@ -10,6 +10,7 @@ import tensorflow as tf
 from data_utils import (annotation_jitter, annotation_to_h5)
 from utils.annolist import AnnotationLib as al
 from rect import Rect
+from env import *
 
 def rescale_boxes(current_shape, anno, target_height, target_width):
   x_scale = target_width / float(current_shape[1])
@@ -23,7 +24,7 @@ def rescale_boxes(current_shape, anno, target_height, target_width):
     r.y2 *= y_scale
   return anno
 
-def load_idl_tf(idlfile, H, jitter):
+def load_idl_tf(phase, idlfile, H, jitter):
   """Take the idlfile and net configuration and create a generator
   that outputs a jittered version of a random image from the annolist
   that is mean corrected."""
@@ -31,7 +32,7 @@ def load_idl_tf(idlfile, H, jitter):
   annolist = al.parse(idlfile)
   annos = []
   for anno in annolist:
-    anno.imageName = os.path.join('/home/yancz/cancer/data/sample/', anno.imageName)
+    anno.imageName = os.path.join(SAMPLE_DIR, anno.imageName)
     annos.append(anno)
   random.seed(0)
   if H['data']['truncate_data']:
@@ -65,6 +66,7 @@ def load_idl_tf(idlfile, H, jitter):
                       H["grid_width"],
                       H["grid_height"],
                       H["rnn_len"])
+      # print(phase + ':' + anno.imageName[31:])
 
       yield {"image": I, "boxes": boxes, "flags": flags}
 
@@ -76,7 +78,8 @@ def make_sparse(n, d):
 def load_data_gen(H, phase, jitter):
   grid_size = H['grid_width'] * H['grid_height']
 
-  data = load_idl_tf(H["data"]['%s_idl' % phase], H, jitter={'train': jitter, 'test': False}[phase])
+  data = load_idl_tf(phase, H["data"]['%s_idl' % phase], H,
+      jitter={'train': jitter, 'test': False}[phase])
 
   for d in data:
     output = {}

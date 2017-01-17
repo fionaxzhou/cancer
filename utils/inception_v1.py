@@ -247,6 +247,7 @@ def inception_v1(inputs,
                  num_classes=1000,
                  is_training=True,
                  dropout_keep_prob=0.8,
+                 input_dropout = -1,
                  prediction_fn=slim.softmax,
                  spatial_squeeze=True,
                  reuse=None,
@@ -285,7 +286,8 @@ def inception_v1(inputs,
                          reuse=reuse) as scope:
     with slim.arg_scope([slim.batch_norm, slim.dropout],
                         is_training=is_training):
-      inputs = slim.dropout(inputs, 0.9, scope='Dropout_input')
+      if input_dropout > 0.0:
+        inputs = slim.dropout(inputs, input_dropout, scope='Dropout_input')
       net, end_points = inception_v1_base(inputs, scope=scope)
       with tf.variable_scope('Logits'):
         net = slim.avg_pool2d(net, [7, 7], stride=1, scope='MaxPool_0a_7x7')

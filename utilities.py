@@ -29,6 +29,11 @@ def voxel_2_world(voxel_coord, itkimage):
     itkimage.TransformContinuousIndexToPhysicalPoint(list(reversed(voxel_coord)))))
   return world_coord
 
+def voxelCoordToWorld(voxelCoord, origin, spacing):
+  stretchedVoxelCoord = voxelCoord * spacing
+  worldCoord = stretchedVoxelCoord + origin
+  return worldCoord
+
 def worldToVoxelCoord(worldCoord, origin, spacing):
   stretchedVoxelCoord = np.absolute(worldCoord - origin)
   voxelCoord = stretchedVoxelCoord / spacing
@@ -51,6 +56,12 @@ def readFileNameMap(map_filename):
     file_map[it['ID_name']] = it['long_name']
   return file_map
 
+def parse_image_file(filename):
+  cols = filename.split("-")
+  subset = cols[0]
+  key = cols[1]
+  z_axis = int(cols[2])
+  return key, subset[:subset.index('/')], z_axis
 
 def filterBoxes(boxes, threshold):
   filtered_boxes = []
@@ -124,3 +135,32 @@ def split(meta_root, samples):
     json.dump(train, g)
   with open(meta_root + 'vals.json', 'w') as g:
     json.dump(vals, g)
+
+
+def writeCSV(filename, lines):
+  with open(filename, "wb") as f:
+    csvwriter = csv.writer(f)
+    csvwriter.writerows(lines)
+
+def tryFloat(value):
+  try:
+    value = float(value)
+  except:
+    value = value
+  
+  return value
+
+def getColumn(lines, columnid, elementType=''):
+  column = []
+  for line in lines:
+    try:
+      value = line[columnid]
+    except:
+      continue
+        
+    if elementType == 'float':
+      value = tryFloat(value)
+
+    column.append(value)
+  return column
+

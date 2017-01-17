@@ -10,14 +10,14 @@ def model(x, H, reuse, is_training=True):
       _, T = inception_v1.inception_v1(x,
                       is_training = is_training,
                       num_classes = 1001,
-                      dropout_keep_prob = 0.8,
+                      dropout_keep_prob = H['dense_dropout'],
+                      input_dropout = H['input_dropout'],
                       spatial_squeeze = False,
                       reuse=reuse)
-    coarse_feat = T['Mixed_5b']
+    coarse_feat = T[H['coarse_feat']]
 
     # fine feat can be used to reinspect input
-    attention_lname = H.get('attention_lname', 'Mixed_3b')
-    early_feat = T[attention_lname]
+    early_feat = T[H['early_feat']]
     early_feat_channels = 480
   elif H['inception'] == 3:
     with slim.arg_scope(inception_v3.inception_v3_arg_scope()):
