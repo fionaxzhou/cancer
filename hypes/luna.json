@@ -21,7 +21,7 @@
     },
     "max_iter" : 120010,
     "inception" : 1,
-    "use_lstm": true,
+    "use_lstm": false,
     "input_dropout" : 0.5,
     "dense_dropout" : 0.5,
     "use_rezoom": true,
@@ -45,7 +45,7 @@
     "lstm_size": 300,
     "deconv": false,
     "num_classes": 2,
-    "rnn_len": 3,
+    "rnn_len": 1,
     "early_feat" : "Mixed_3b",
     "coarse_feat" : "Mixed_3c"
 }

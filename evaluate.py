@@ -2,7 +2,7 @@
 # @Author: yancz1989
 # @Date:   2017-01-11 09:10:31
 # @Last Modified by:   yancz1989
-# @Last Modified time: 2017-01-17 22:04:58
+# @Last Modified time: 2017-01-23 01:34:37
 
 import tensorflow as tf
 import matplotlib.pyplot as plt
@@ -23,36 +23,55 @@ from utils.rect import Rect
 from utils.stitch_wrapper import stitch_rects
 from evaluate import add_rectangles
 import cv2
-import SimpleITK
+import SimpleITK as sitk
 from cv2 import imread, imwrite
 from utilities import trans, readImageMap, readFileNameMap, readResultMap, load_itk_image, normalizePlanes, worldToVoxelCoord, voxel_2_world, parse_image_file, filterBoxes, readCSV
 from env import *
 
+def get_image_map(data_root, result_list, threshold):
+  result_map = {}
+  for it in result_list:
+    key, subset, z = parse_image_file(it['file'])
+    src_file = os.path.join(
+      data_root, subset, key + ".mhd")
+    boxes = filterBoxes(it['box'], threshold)
+    if not result_map.get(src_file):
+      result_map[src_file] = []
+    result_map[src_file].append((key, z, boxes))
+
+  return result_map
+
 def generate_result(data_root, result_list, output_file, thr = 0.1):
+  result_map = get_image_map(data_root, result_list, thr)
   with open(output_file, 'w') as fout:
     fout.write("seriesuid,coordX,coordY,coordZ,probability\n")
-    for it in result_list:
-      key, subset, z = parse_image_file(it['file'])
-      src_file = str(data_root + subset + '/' + key + ".mhd")
-      itkimage = SimpleITK.ReadImage(src_file)
-      boxes = filterBoxes(it['box'], thr)
-      for box in boxes:
-        world_box = voxel_2_world([z, box[1], box[0]], itkimage)
-        csv_line = (key + "," + str(world_box[2]) + "," + 
-            str(world_box[1]) + "," + str(world_box[0]) + "," + str(box[4]))
-        print(csv_line)
-        fout.write(csv_line + "\n")
-  lines = readCSV(output_file)
-  keys = []
-  for line in lines[1:]:
-    keys.append(line[0])
-  keys = list(set(keys))
-  keys.sort()
-  with open(output_file[:output_file.rindex('/') + 1] + 'keys.csv', "w") as f:
-    for key in keys:
-      f.write(key + "\n")
+    for fkey, val in result_map.items():
+      itkimage = sitk.ReadImage(str(fkey))
+      for it in val:
+        key, z, boxes = it
+        for box in boxes:
+          world_box = voxel_2_world(
+            [z, box[1], box[0]], itkimage)
+          csv_line = key + "," + str(world_box[2]) + "," + str(world_box[1]) + "," + str(world_box[0]) + "," + str(box[4])
+          print(csv_line)
+          fout.write(csv_line + "\n")
 
-def evaluate(H, valids, param_path, thr = 0.7, l = 60000, r = 120010, sep = 10000):
+# def generate_result(data_root, result_list, output_file, thr = 0.1):
+#   with open(output_file, 'w') as fout:
+#     fout.write("seriesuid,coordX,coordY,coordZ,probability\n")
+#     for it in result_list:
+#       key, subset, z = parse_image_file(it['file'])
+#       src_file = str(data_root + subset + '/' + key + ".mhd")
+#       itkimage = sitk.ReadImage(src_file)
+#       boxes = filterBoxes(it['box'], thr)
+#       for box in boxes:
+#         world_box = voxel_2_world([z, box[1], box[0]], itkimage)
+#         csv_line = (key + "," + str(world_box[2]) + "," + 
+#             str(world_box[1]) + "," + str(world_box[0]) + "," + str(box[4]))
+#         print(csv_line)
+#         fout.write(csv_line + "\n")
+
+def evaluate(H, valids, param_path, thr = 0.7, l = 60000, r = 120010, sep = 10000, with_anno = True):
   true_annos = al.parse(valids)
   L = range(l, r, sep)
   for iteration in L:
@@ -76,6 +95,7 @@ def evaluate(H, valids, param_path, thr = 0.7, l = 60000, r = 120010, sep = 1000
     config = tf.ConfigProto(gpu_options=gpu_options)
     with tf.Session(config = config) as sess:
       sess.run(tf.initialize_all_variables())
+      print('load from ' + (param_path + 'save.ckpt-%d' % iteration))
       saver.restore(sess, param_path + 'save.ckpt-%d' % iteration)
 
       annolist = al.AnnoList()
@@ -90,6 +110,7 @@ def evaluate(H, valids, param_path, thr = 0.7, l = 60000, r = 120010, sep = 1000
         (np_pred_boxes, np_pred_confidences) = sess.run([pred_boxes, pred_confidences], feed_dict=feed)
         pred_anno = al.Annotation()
         pred_anno.imageName = true_anno.imageName
+        print(pred_anno.imageName)
         new_img, rects = add_rectangles(H, [img], np_pred_confidences, np_pred_boxes,
                         use_stitching=True, rnn_len=H['rnn_len'], min_conf=thr,
                         show_suppressed=False)
@@ -97,11 +118,11 @@ def evaluate(H, valids, param_path, thr = 0.7, l = 60000, r = 120010, sep = 1000
         pred_anno.rects = rects
         annolist.append(pred_anno)
         fname = true_anno.imageName
-        imwrite(output_dir + 'val/' + fname[fname.rindex('/') + 1 : -4] + '_' + str(iteration) + '_pred.jpg', new_img)
-        shutil.copy(SAMPLE_DIR + true_anno.imageName[:-4] + '_gt.bmp',
-          output_dir + 'val/' + fname[fname.rindex('/') + 1 : -4] + '_gt.bmp')
+        if with_anno:
+          imwrite(output_dir + 'val/' + fname[fname.rindex('/') + 1 : -4] + '_' + str(iteration) + '_pred.jpg', new_img)
+          shutil.copy(SAMPLE_DIR + true_anno.imageName[:-4] + '_gt.bmp',
+            output_dir + 'val/' + fname[fname.rindex('/') + 1 : -4] + '_gt.bmp')
         box_confs = trans(np_pred_boxes, H, np_pred_confidences, thr)
-        print(len(box_confs.tolist()))
         ret = {
           'file' : fname,
           'box' : box_confs.tolist()
@@ -132,8 +153,8 @@ def main():
   with open(hypes_file, 'r') as f:
     H = json.load(f)
     H['subset'] = 'subset' + args.subset
-    evaluate(H, META_DIR + output + '.json', OUTPUT_DIR + output + '/', args.thr,
-        args.left, args.right, args.sep)
+    evaluate(H, META_DIR + output + '-scan.json', OUTPUT_DIR + output + '/', args.thr,
+        args.left, args.right, args.sep, with_anno = False)
 
 if __name__ == '__main__':
   main()

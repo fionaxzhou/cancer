@@ -1,0 +1,234 @@
+% \documentclass[twoside,11pt]{article}
+\documentclass[11pt]{article}
+
+\usepackage{times,fullpage}
+\usepackage{amsthm,amsfonts,amsmath,amssymb,color,float,graphicx,verbatim}
+\usepackage{subfigure} 
+\usepackage{natbib}
+\usepackage{algorithm,algorithmic}
+\newcommand{\theHalgorithm}{\arabic{algorithm}}
+\usepackage{hyperref}
+
+\usepackage{mathtools}
+\usepackage{bbm}
+\usepackage{csquotes}
+
+\newtheorem{theorem}{Theorem}
+\newtheorem{proposition}{Proposition}
+\newtheorem{claim}{Claim}
+\newtheorem{lemma}{Lemma}
+\newtheorem{corollary}{Corollary}
+%\newtheorem*{conditions}{Conditions}
+\newtheorem{definition}{Definition}
+\newtheorem{assumption}{Assumption}
+
+%\renewenvironment{proof}[1][Proof: ]{\noindent \textbf{#1}}{\qed\medskip}
+%\renewcommand{\baselinestretch}{2}
+
+\newcommand{\pr}[1]{\mathbb{P}\left[ #1 \right]}
+\newcommand{\Var}[1]{\text{Var}\left[ #1 \right]}
+\newcommand{\floor}[1]{\lfloor #1 \rfloor}
+\newcommand{\ceil}[1]{\left\lceil #1 \right\rceil}
+\newcommand{\abs}[1]{\left| #1 \right|}
+\newcommand{\one}{\mathbbm{1}}
+\newcommand{\reals}{\mathbb{R}}
+\newcommand{\E}{\mathbb{E}}
+\newcommand{\LL}{\mathbb{L}}
+\newcommand{\sign}{\mathrm{sign}}
+\newcommand{\half}{\frac{1}{2}}
+\newcommand{\argmin}[1]{\underset{#1}{\mathrm{argmin}}}
+\newcommand{\argmax}[1]{\underset{#1}{\mathrm{argmax}}}
+\newcommand{\summ}{\displaystyle \sum}
+\newcommand{\intt}{\displaystyle\int}
+\newcommand{\var}{\text{Var}}
+\newcommand{\nchoosek}[2]{\left(\begin{array}{*{20}c}#1\\#2\end{array}\right)}
+
+\newcommand{\rank}{\text{rank}}
+\newcommand{\relu}[1]{\left[ #1 \right]_+}
+\newcommand{\coleq}{\coloneqq}
+\newcommand{\set}[1]{\left\lbrace#1\right\rbrace}
+\newcommand{\bas}{\text{Bas}}
+\newcommand{\p}[1]{\left( #1 \right)}
+\newcommand{\pcc}[1]{\left[ #1 \right]}
+\newcommand{\poc}[1]{\left( #1 \right]}
+\newcommand{\pco}[1]{\left[ #1 \right)}
+\newcommand{\bbr}{\mathbb{R}}
+\newcommand{\bbn}{\mathbb{N}}
+\newcommand{\bbq}{\mathbb{Q}}
+\newcommand{\ita}{\mathit{a}}
+\newcommand{\itu}{\mathit{u}}
+\newcommand{\itv}{\mathit{v}}
+\newcommand{\itr}{\mathit{r}}
+\newcommand{\itk}{\mathit{k}}
+\newcommand{\itm}{\mathit{m}}
+\newcommand{\itn}{\mathit{n}}
+\newcommand{\itw}{\mathit{w}}
+\newcommand{\itx}{\mathit{x}}
+\newcommand{\ity}{\mathit{y}}
+\newcommand{\itz}{\mathit{z}}
+\newcommand{\itp}{\mathit{p}}
+\newcommand{\ba}{\mathbf{a}}
+\newcommand{\be}{\mathbf{e}}
+\newcommand{\bx}{\mathbf{x}}
+\newcommand{\bw}{\mathbf{w}}
+\newcommand{\bg}{\mathbf{g}}
+\newcommand{\bb}{\mathbf{b}}
+\newcommand{\bu}{\mathbf{u}}
+\newcommand{\bv}{\mathbf{v}}
+\newcommand{\bz}{\mathbf{z}}
+\newcommand{\bc}{\mathbf{c}}
+\newcommand{\bd}{\mathbf{d}}
+\newcommand{\bh}{\mathbf{h}}
+\newcommand{\by}{\mathbf{y}}
+\newcommand{\bn}{\mathbf{n}}
+\newcommand{\bs}{\mathbf{s}}
+\newcommand{\bp}{\mathbf{p}}
+\newcommand{\bq}{\mathbf{q}}
+\newcommand{\bmu}{\boldsymbol{\mu}}
+\newcommand{\balpha}{\boldsymbol{\alpha}}
+\newcommand{\bbeta}{\boldsymbol{\beta}}
+\newcommand{\btau}{\boldsymbol{\tau}}
+\newcommand{\bxi}{\boldsymbol{\xi}}
+\newcommand{\blambda}{\boldsymbol{\lambda}}
+\newcommand{\bepsilon}{\boldsymbol{\epsilon}}
+\newcommand{\bsigma}{\boldsymbol{\sigma}}
+\newcommand{\btheta}{\boldsymbol{\theta}}
+\newcommand{\bomega}{\boldsymbol{\omega}}
+\newcommand{\Lcal}{\mathcal{L}}
+\newcommand{\Ocal}{\mathcal{O}}
+\newcommand{\Acal}{\mathcal{A}}
+\newcommand{\Gcal}{\mathcal{G}}
+\newcommand{\Ccal}{\mathcal{C}}
+\newcommand{\Xcal}{\mathcal{X}}
+\newcommand{\Jcal}{\mathcal{J}}
+\newcommand{\Dcal}{\mathcal{D}}
+\newcommand{\Fcal}{\mathcal{F}}
+\newcommand{\Hcal}{\mathcal{H}}
+\newcommand{\Rcal}{\mathcal{R}}
+\newcommand{\Ncal}{\mathcal{N}}
+\newcommand{\Scal}{\mathcal{S}}
+\newcommand{\Pcal}{\mathcal{P}}
+\newcommand{\Qcal}{\mathcal{Q}}
+\newcommand{\Wcal}{\mathcal{W}}
+\newcommand{\Ld}{\tilde{L}}
+\newcommand{\uloss}{\ell^\star}
+\newcommand{\loss}{\mathcal{L}}
+\newcommand{\losst}{\ell_t}
+\newcommand{\norm}[1]{\left\|#1\right\|}
+\newcommand{\inner}[1]{\left\langle#1\right\rangle}
+\renewcommand{\comment}[1]{\textcolor{red}{\textbf{#1}}}
+\newcommand{\vol}{\texttt{Vol}}
+
+\newtheorem{example}{Example}
+
+\newcommand{\secref}[1]{Sec.~\ref{#1}}
+\newcommand{\subsecref}[1]{Subsection~\ref{#1}}
+\newcommand{\figref}[1]{Fig.~\ref{#1}}
+\renewcommand{\eqref}[1]{Eq.~(\ref{#1})}
+\newcommand{\lemref}[1]{Lemma~\ref{#1}}
+\newcommand{\corollaryref}[1]{Corollary~\ref{#1}}
+\newcommand{\thmref}[1]{Thm.~\ref{#1}}
+\newcommand{\propref}[1]{Proposition~\ref{#1}}
+\newcommand{\appref}[1]{Appendix~\ref{#1}}
+\newcommand{\algref}[1]{Algorithm~\ref{#1}}
+
+\newcommand{\note}[1]{\textcolor{red}{\textbf{#1}}}
+
+\usepackage{hyperref}
+\hypersetup{
+  colorlinks   = true, %Colours links instead of ugly boxes
+  urlcolor     = blue, %Colour for external hyperlinks
+  linkcolor    = blue, %Colour of internal links
+  citecolor   = red %Colour of citations
+}
+
+
+% \usepackage{jmlr2e}
+
+% Definitions of handy macros can go here
+
+% \newcommand{\dataset}{{\cal D}}
+% \newcommand{\fracpartial}[2]{\frac{\partial #1}{\partial  #2}}
+
+% Heading arguments are {volume}{year}{pages}{submitted}{published}{author-full-names}
+
+% \jmlrheading{1}{2000}{1-48}{4/00}{10/00}{Chengzhe Yan}
+
+% Short headings should be running head and authors last names
+
+% \ShortHeadings{On Relationship Between Spins and Linear Regions}{Chengzhe Yan, Changshui Zhang}
+% \firstpageno{1}
+
+\begin{document}
+
+\title{2016 LUNA Challenge Description Document}
+
+% \author{\name Chengzhe Yan \email yancz12@mails.tsinghua.edu.cn\\
+%        \addr Department of Automation\\
+%        Tsinghua University\\
+%        Haidian District, Beijing, China
+%        \and
+%        \name Changshui Zhang \email zcs@mail.tsinghua.edu.cn\\
+%        \addr Department of Automation\\
+%        Tsinghua University\\
+%        Haidian District, Beijing, China}
+
+% \author{Chengzhe Yan\\
+%         yancz12@mails.tsinghua.edu.cn\\
+%         Department of Automation\\
+%         Tsinghua University\\
+        % Haidian District, Beijing, China
+       % \and
+       % Changshui Zhang\\
+       % zcs@mail.tsinghua.edu.cn\\
+       % Department of Automation\\
+       % Tsinghua University
+       % }
+       % Haidian District, Beijing, China}
+
+% \editor{Leslie Pack Kaelbling}
+
+\maketitle
+
+\begin{abstract}%   <- trailing '%' for backward compatibility of .sty file
+This document contains brief introduction to models we applied and the fully detailed experiment procedure description.
+\end{abstract}
+
+% \begin{keywords}
+%   DNN, Expressiveness, Local Minimas
+% \end{keywords}
+
+\section{Introduction to Models}
+
+We adopt deep neural network model into detection tasks, based on Overfeat\cite{sermanet2013overfeat}, TensorBox\cite{stewart2015end} with a specially designed loss function. For CNN substructure to extract features from raw image input, Google Inception V1\cite{szegedy2015going} is used. LSTM\cite{hochreiter1997long} is used for detection and merge object proposed by region proposing network.
+This model is built and running using Tensorflow\cite{abadi2016tensorflow}.
+
+Inception V1 are designed for ImageNet challenge which is highly complicated. With such complexity, it would be easily to overfit the data since the task is considerable simple. We fine-tune the structure and choose lower layers architecture for feature extractor. Also larger dropout ratio is used for better generalization. Adam\cite{kingma2014adam} is used for training with default learning rate and other parameters.
+
+\section{Experiment Design Details}
+We use the dataset provided by LUNA\cite{setio2016validation}. The dataset is divided into 10 subsets with annotations given. The procedures for training and validation are described below:
+\begin{enumerate}
+\item Slice all the data into $512\times512$ sized image noted as $I$, using annotations given in the dataset, and here we use $I_i$ for images set from the $i$th subset. And slices with annotations are noted as $A$ and $A_i$ for $i$th subset.
+\item Perform CV of $i$ round using all sliced image with annotation $A$ \textbf{except} the $i$-th subset $A_i$, with \textbf{argumentation using rotation and flipping}.
+\item After training of each round, model learned is tested and evaluate on the images sliced from CT file \textbf{without} annotations.
+\item We use the same hyper-parameters for training on each subset. The only variable is the number of training epochs.
+\item Model and results submitted is the best average result from LUNA evaluation scripts on all subsets of the \textbf{same training epoch cycles} .
+\end{enumerate}
+
+
+
+% \acks{We would like to acknowledge support for this project
+% from the National Science Foundation. }
+
+
+\newpage
+
+% \appendix
+% \section*{Appendix A.}
+% \label{app:theorem}
+
+% \vskip 0.2in
+\bibliographystyle{abbrv}
+\bibliography{ref}
+
+\end{document}

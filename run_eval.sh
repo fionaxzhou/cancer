@@ -5,10 +5,12 @@ ANNOT_EX_FILE="data/trunk/CSVFILES/annotations_excluded.csv"
 OUTPUT_DIR="test/"
 
 RESULT_FILE=$1
-KEY_FILE=$2
+KEY_FILE=test/keys.csv
 
 echo ${RESULT_FILE}
 echo ${KEY_FILE}
+
+python keys.py ${RESULT_FILE}
 
 python noduleCADEvaluationLUNA16.py \
   ${ANNOT_FILE} \
@@ -17,3 +19,4 @@ python noduleCADEvaluationLUNA16.py \
   ${RESULT_FILE} \
   ${OUTPUT_DIR}
 
+cat test/CADAnalysis.txt
