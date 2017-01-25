@@ -69,7 +69,6 @@ def generate_data(data_root, data_map, output_dir, box = False):
       json.dump(samples[key], f)
 
 
-
 if __name__ == '__main__':
   dirs = [SAMPLE_DIR, META_DIR, OUTPUT_DIR,] + [SAMPLE_DIR + 'subset' + str(i) for i in range(10)]
   for d in dirs:

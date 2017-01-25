@@ -1,0 +1,12 @@
+{
+  "subset": 5,
+  "model": "logistic",
+  "penalty": "l2",
+  "lambda": 100,
+  "tol": 1e-4,
+  "jobs": 2,
+  "kernel": "rbf",
+  "lr": 1e-4,
+  "depth": 3,
+  "verbose": 4
+}
