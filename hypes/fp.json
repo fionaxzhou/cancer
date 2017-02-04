@@ -1,0 +1,8 @@
+{
+  "gpu": 2,
+  "opt": "Adam",
+  "lr": 1e-4,
+  "batch_size": 64,
+  "epochs": 20,
+  "norm_clip": 1.0
+}

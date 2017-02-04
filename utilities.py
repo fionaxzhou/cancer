@@ -164,3 +164,7 @@ def getColumn(lines, columnid, elementType=''):
     column.append(value)
   return column
 
+def mkdir(d):
+  if not os.path.exists(d):
+    os.mkdir(d)
+

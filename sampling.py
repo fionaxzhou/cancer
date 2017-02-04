@@ -72,8 +72,7 @@ def generate_data(data_root, data_map, output_dir, box = False):
 if __name__ == '__main__':
   dirs = [SAMPLE_DIR, META_DIR, OUTPUT_DIR,] + [SAMPLE_DIR + 'subset' + str(i) for i in range(10)]
   for d in dirs:
-    if not os.path.exists(d):
-      os.mkdir(d)
+    mkdir(d)
   data_map = util.readImageMap(ANNOTATION_CSV)
   generate_data(TRUNK_DIR, data_map, SAMPLE_DIR)
 
