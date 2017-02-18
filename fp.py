@@ -2,7 +2,7 @@
 # @Author: yancz1989
 # @Date:   2017-02-03 16:18:59
 # @Last Modified by:   yancz1989
-# @Last Modified time: 2017-02-05 00:25:20
+# @Last Modified time: 2017-02-17 08:47:28
 
 import tensorflow as tf
 import numpy as np
@@ -13,7 +13,6 @@ import tensorflow.contrib.slim as slim
 import sys
 import time
 import cv2
-import threading
 import json
 import logging
 import utils.inception_v2
@@ -21,9 +20,22 @@ from tensorflow.contrib.layers import convolution2d as conv2d
 from tensorflow.contrib.layers import max_pool2d, fully_connected, avg_pool2d, dropout, flatten
 from tensorflow.contrib.layers import xavier_initializer_conv2d as init_conv
 from tensorflow.contrib.layers import variance_scaling_initializer as init_fc
+from trunk import Trunk
 
+class FPTrunk(Trunk):
+  def __init__(self, data_list, x, y, bsize, sess):
+    Trunk.__init__(self, data_list, x, y, bsize, sess)
 
-def build(H, x, training = True):
+  def read(self, key, idx):
+    img = cv2.imread(self.data_list[key][idx][0], 0)
+    if img.size != 64 * 64:
+      x_ = None
+    else:
+      x_ = np.array(img).astype(np.float32).reshape(64, 64, 1)
+    y_ = np.array(self.data_list[key][idx][1]).astype(np.int64)
+    return x_, y_
+
+def model(H, x, training = True):
   reuse = None if training else True
 
   net = conv2d(x, 64, [3, 3], activation_fn = tf.nn.relu)
@@ -51,7 +63,7 @@ def build(H, x, training = True):
   pred = tf.argmax(logits, axis = 1)
   return logits, pred
 
-def train(args):
+def build(args, dat, training, sess):
   with open(args.hype) as f:
     H = json.load(f)
     H['subset'] = args.subset
@@ -61,55 +73,27 @@ def train(args):
   with open(META_DIR + 'fp.json') as fpj:
     meta = json.load(fpj)
 
-  logging.basicConfig(filename = 'fp_detect_' + str(H['subset']) + '.log', 
+  logging.basicConfig(filename = 'fp_detect_' + str(H['subset']) + '.log',
         format='%(asctime)s %(message)s', datefmt='%m/%d/%Y %I:%M:%S %p', level=logging.DEBUG)
 
   bsize = H['batch_size']
   x = tf.placeholder(tf.float32, shape = [64, 64, 1])
   y = tf.placeholder(tf.int64, shape = [])
 
-  q, eq_op= {}, {}
-  for training in ['train', 'valid']:
-    q[training] = tf.FIFOQueue(capacity = bsize * 2, dtypes = [tf.float32, tf.int64],
-        shapes = ([64, 64, 1], []))
-    eq_op[training] = q[training].enqueue([x, y])
-  Xt, Yt = tf.train.batch(q['train'].dequeue(), batch_size = bsize, capacity = bsize * 2)
-  Xv, Yv = tf.train.batch(q['valid'].dequeue(), batch_size = bsize, capacity = bsize * 2)
+  fptrunk = FPTrunk(dat, x, y, bsize, sess)
+  Xt, Yt = tf.train.batch(fptrunk.q['train'].dequeue(), batch_size = bsize, capacity = bsize * 2)
+  Xv, Yv = tf.train.batch(fptrunk.q['valid'].dequeue(), batch_size = bsize, capacity = bsize * 2)
 
-  dat = {}
-  dat['train'] = []
-  dat['valid'] = []
-  for i in range(10):
-    if i == H['subset']:
-      dat['valid'] = meta['subset' + str(i)]
-    else:
-      dat['train'] += meta['subset' + str(i)]
-  train_batches = len(dat['train']) / bsize
-  valid_batches = len(dat['valid']) / bsize
-
-  def data_generator(sess, dataset, key = 'train'):
-    dat = dataset[key]
-    idx = np.arange(len(dat))
-    while True:
-      np.random.shuffle(idx)
-      for i in range(len(idx)):
-        img = cv2.imread(dat[idx[i]][0], 0)
-        if img.size != 64 * 64:
-          continue
-        x_ = np.array(img).astype(np.float32).reshape(64, 64, 1)
-        y_ = np.array(dat[idx[i]][1]).astype(np.int64)
-        sess.run(eq_op[key], feed_dict = {x : x_, y : y_})
-
-  logits, pred = build(H, Xt, True)
+  logits, pred = model(H, Xt, training)
   varst = tf.trainable_variables()
   gstep = tf.Variable(0, trainable = False)
   loss = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(
-      logits, tf.one_hot(indices = Yt, depth = 2)))
-  TN = tf.reduce_sum(tf.cast(tf.not_equal(pred, Yt) & tf.equal(Yt, 1), tf.float32))
+      logits=logits, labels=tf.one_hot(indices = Yt, depth = 2)))
+  FN = tf.reduce_sum(tf.cast(tf.not_equal(pred, Yt) & tf.equal(Yt, 1), tf.float32))
   FP = tf.reduce_sum(tf.cast(tf.not_equal(pred, Yt) & tf.equal(Yt, 0), tf.float32))
   acc = tf.reduce_sum(tf.cast(tf.equal(pred, Yt), tf.float32)) / tf.size(Yt, out_type = tf.float32)
 
-  vTN = tf.reduce_sum(tf.cast(tf.not_equal(pred, Yt) & tf.equal(Yt, 1), tf.float32))
+  vFN = tf.reduce_sum(tf.cast(tf.not_equal(pred, Yt) & tf.equal(Yt, 1), tf.float32))
   vFP = tf.reduce_sum(tf.cast(tf.not_equal(pred, Yt) & tf.equal(Yt, 0), tf.float32))
   vAcc = tf.reduce_sum(tf.cast(tf.equal(pred, Yt), tf.float32)) / tf.size(Yt, out_type = tf.float32)
   opts = {
@@ -126,78 +110,97 @@ def train(args):
         global_step = gstep)
 
   tf.summary.scalar('loss', loss)
-  tf.summary.scalar('TN', TN)
+  tf.summary.scalar('FN', FN)
   tf.summary.scalar('FP', FP)
   tf.summary.scalar('acc', acc)
-  tf.summary.scalar('vTN', vTN)
+  tf.summary.scalar('vFN', vFN)
   tf.summary.scalar('vFP', vFP)
   tf.summary.scalar('vacc', vAcc)
   tf.summary.scalar('norm', tf.reduce_sum(norm))
-  summary_op = tf.merge_all_summaries()
+  summary_op = tf.summary.merge_all()
+
+  saver = tf.train.Saver(max_to_keep = None)
+  writer = tf.summary.FileWriter(logdir = H['save_dir'], flush_secs = 10)
+  return (H, x, y, Xt, Yt, Xv, Yv,
+    logits, pred, varst, gstep, loss, FN, FP, acc, vFN, vFP, vAcc, opt,
+    grads_vars, grads, vars, capped, norm, train_opt, summary_op, saver, writer, fptrunk)
+
+def train(args):
+  with open(args.hype) as f:
+    H = json.load(f)
+    H['subset'] = args.subset
+    H['save_dir'] = OUTPUT_DIR + 'subset' + str(H['subset'])
+    if args.gpu != None:
+      H['gpu'] = args.gpu
+  with open(META_DIR + 'fp.json') as fpj:
+    meta = json.load(fpj)
+
+  dat = {}
+  dat['train'] = []
+  dat['valid'] = []
+  for i in range(10):
+    if i == args.subset:
+      dat['valid'] = meta['subset' + str(i)]
+    else:
+      dat['train'] += meta['subset' + str(i)]
+  tf.set_random_seed(2012310818)
 
   os.environ['CUDA_VISIBLE_DEVICES'] = str(H['gpu'])
   gpu_options = tf.GPUOptions()
-  gpu_options.allow_growth=True
-  config = tf.ConfigProto(gpu_options=gpu_options)
-
-  saver = tf.train.Saver(max_to_keep = None)
-  writer = tf.train.SummaryWriter(logdir = H['save_dir'], flush_secs = 10)
+  gpu_options.allow_growth = True
+  config = tf.ConfigProto(gpu_options = gpu_options)
 
   with tf.Session(config = config) as sess:
+    (H, x, y, Xt, Yt, Xv, Yv,
+    logits, pred, varst, gstep, loss, FN, FP, acc, vFN, vFP, vAcc, opt,
+    grads_vars, grads, vars, capped, norm, train_opt, summary_op, saver, writer, fptrunk) = build(args, dat, True, sess)
+
     sess.run(tf.global_variables_initializer())
-    eq_threads = {}
-    for key in ['train', 'valid']:
-      eq_threads[key] = threading.Thread(target = data_generator, args = [sess, dat, key])
-      eq_threads[key].isDaemon()
-      eq_threads[key].start()
-    coord = tf.train.Coordinator()
-    threads = tf.train.start_queue_runners(coord = coord, sess = sess)
+    fptrunk.start()
     if args.weight != None:
       logging.info('Restoring from %s...' % args.weight)
       saver.restore(sess, weight)
-
+    bsize = fptrunk.bsize
+    train_batches = fptrunk.nbatches['train']
+    valid_batches = fptrunk.nbatches['valid']
     for epoch in range(H['epochs']):
       tst = time.time()
-      tol_loss, tol_ttn, tol_tfp, tol_vtn, tol_vfp, tol_acc, tol_vacc = [0.0] * 7
-      for step in range(1, train_batches + 1):
+      tol_loss, tol_tfn, tol_tfp, tol_vfn, tol_vfp, tol_acc, tol_vacc = [0.0] * 7
+      for step in range(1, train_batches):
         curX, curY = sess.run([Xt, Yt])
-        _, tloss, tacc, tn, fp = sess.run([train_opt, loss, acc, TN, FP], feed_dict = {Xt: curX, Yt: curY})
+        _, tloss, tacc, fn, fp = sess.run([train_opt, loss, acc, FN, FP], feed_dict = {Xt: curX, Yt: curY})
+
         if step % 100 == 0:
-          logging.info('Training batchs %d, avg loss %f, acc %f, TN %d/%d, FP %d/%d.' % 
-            (step, tol_loss / step, tol_acc / step, tol_ttn, step * bsize, tol_tfp, step * bsize))
+          logging.info('Training batchs %d, avg loss %f, acc %f, FN %d/%d, FP %d/%d.' %
+            (step, tol_loss / step, tol_acc / step, tol_tfn, step * bsize, tol_tfp, step * bsize))
           summary_str = sess.run(summary_op)
           writer.add_summary(summary_str, global_step = gstep.eval())
         tol_loss += tloss
-        tol_ttn += tn
+        tol_tfn += fn
         tol_tfp += fp
         tol_acc += tacc
 
       for step in range(valid_batches):
         curX, curY = sess.run([Xv, Yv])
-        vtn, vfp, vacc = sess.run([vTN, vFP, vAcc], feed_dict = {Xt : curX, Yt: curY})
-        tol_vtn += vtn
+        vfn, vfp, vacc = sess.run([vFN, vFP, vAcc], feed_dict = {Xt : curX, Yt: curY})
+        tol_vfn += vfn
         tol_vfp += vfp
         tol_vacc += vacc
 
       t = time.time() - tst
       print((epoch, t, tol_loss / (train_batches * bsize),
-        float(tol_vtn) / (valid_batches * bsize), float(tol_vfp) / (valid_batches * bsize),
+        float(tol_vfn) / (valid_batches * bsize), float(tol_vfp) / (valid_batches * bsize),
         tol_vacc / valid_batches))
-      logging.info(('epoch %d, time elapse %f, training loss %f,' + 
-        ' valid avg TN %f, FP %f, acc %f.') % (epoch, t, tol_loss / (train_batches * bsize),
-        float(tol_vtn) / (valid_batches * bsize), float(tol_vfp) / (valid_batches * bsize),
+      logging.info(('epoch %d, time elapse %f, training loss %f,' +
+        ' valid avg FN %f, FP %f, acc %f.') % (epoch, t, tol_loss / (train_batches * bsize),
+        float(tol_vfn) / (valid_batches * bsize), float(tol_vfp) / (valid_batches * bsize),
         tol_vacc / valid_batches))
       saver.save(sess, OUTPUT_DIR + 'subset' + str(H['subset']) + '/save.ckpt', global_step = gstep)
 
     logging.info('training finished, try ending...')
-    sess.run(q.close(cancel_pending_enqueues=True))
-    coord.request_stop()
-    coord.join(threads)
-    sess.close()
+    fptrunk.stop()
     logging.info('ended...')
-
-def validate():
-  pass
+    sess.close()
 
 def main():
   parser = argparse.ArgumentParser()
@@ -209,11 +212,8 @@ def main():
   args = parser.parse_args()
   if args.hype == None or args.subset == None:
     raise 'Error: Config file and subset need to be specified.'
-  tf.set_random_seed(2012310818)
   if args.train == 1:
     train(args)
-  else:
-    validate(args)
 
 if __name__ == '__main__':
   main()

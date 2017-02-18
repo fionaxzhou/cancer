@@ -5,13 +5,6 @@ import json
 from PIL import Image, ImageDraw
 from env import *
 
-
-
-# DATA_ROOT = '/home/yangxm/Workspace/data/LUNA16/'
-# CANDIDATE_CSV = ('/home/yangxm/Workspace/data/LUNA16/CSVFILES/candidates.csv')
-# POSITIVE_DIR = ('/home/yangxm/Workspace/data/LUNA16/classification/fp/positive/')
-# NEGATIVE_DIR = ('/home/yangxm/Workspace/data/LUNA16/classification/fp/negative/')
-
 MOV_LIST = [(-10, -10), (-10, 0), (-10, 10), (0, -10),
             (0, 10), (10, -10), (10, 0), (10, 10)]
 
