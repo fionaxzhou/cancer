@@ -2,7 +2,7 @@
 # @Author: yancz1989
 # @Date:   2017-01-11 09:10:31
 # @Last Modified by:   yancz1989
-# @Last Modified time: 2017-01-23 01:34:37
+# @Last Modified time: 2017-02-19 11:37:41
 
 import tensorflow as tf
 import matplotlib.pyplot as plt
@@ -14,7 +14,7 @@ import shutil
 import sys
 import time; 
 from PIL import Image
-from train import build_forward
+from tensorbox import build_forward
 from utils import train_utils
 from utils.annolist import AnnotationLib as al
 from utils.stitch_wrapper import stitch_rects
@@ -38,7 +38,6 @@ def get_image_map(data_root, result_list, threshold):
     if not result_map.get(src_file):
       result_map[src_file] = []
     result_map[src_file].append((key, z, boxes))
-
   return result_map
 
 def generate_result(data_root, result_list, output_file, thr = 0.1):
@@ -89,20 +88,19 @@ def evaluate(H, valids, param_path, thr = 0.7, l = 60000, r = 120010, sep = 1000
     else:
       pred_boxes, pred_logits, pred_confidences = build_forward(H, tf.expand_dims(x_in, 0), 'test', reuse=None)
     saver = tf.train.Saver()
-    output_dir = OUTPUT_DIR + H['subset'] + '/'
     gpu_options = tf.GPUOptions()
     gpu_options.allow_growth=True
     config = tf.ConfigProto(gpu_options=gpu_options)
     with tf.Session(config = config) as sess:
-      sess.run(tf.initialize_all_variables())
+      sess.run(tf.global_variables_initializer())
       print('load from ' + (param_path + 'save.ckpt-%d' % iteration))
       saver.restore(sess, param_path + 'save.ckpt-%d' % iteration)
 
       annolist = al.AnnoList()
       rslt = []
       t = time.time()
-      if not os.path.exists(output_dir + 'val'):
-        os.makedirs(output_dir + 'val')
+      if not os.path.exists(param_path + 'val'):
+        os.makedirs(param_path + 'val')
       for i in range(len(true_annos)):
         true_anno = true_annos[i]
         img = imread(SAMPLE_DIR + true_anno.imageName)
@@ -110,7 +108,6 @@ def evaluate(H, valids, param_path, thr = 0.7, l = 60000, r = 120010, sep = 1000
         (np_pred_boxes, np_pred_confidences) = sess.run([pred_boxes, pred_confidences], feed_dict=feed)
         pred_anno = al.Annotation()
         pred_anno.imageName = true_anno.imageName
-        print(pred_anno.imageName)
         new_img, rects = add_rectangles(H, [img], np_pred_confidences, np_pred_boxes,
                         use_stitching=True, rnn_len=H['rnn_len'], min_conf=thr,
                         show_suppressed=False)
@@ -119,9 +116,9 @@ def evaluate(H, valids, param_path, thr = 0.7, l = 60000, r = 120010, sep = 1000
         annolist.append(pred_anno)
         fname = true_anno.imageName
         if with_anno:
-          imwrite(output_dir + 'val/' + fname[fname.rindex('/') + 1 : -4] + '_' + str(iteration) + '_pred.jpg', new_img)
+          imwrite(param_path + 'val/' + fname[fname.rindex('/') + 1 : -4] + '_' + str(iteration) + '_pred.jpg', new_img)
           shutil.copy(SAMPLE_DIR + true_anno.imageName[:-4] + '_gt.bmp',
-            output_dir + 'val/' + fname[fname.rindex('/') + 1 : -4] + '_gt.bmp')
+            param_path + 'val/' + fname[fname.rindex('/') + 1 : -4] + '_gt.bmp')
         box_confs = trans(np_pred_boxes, H, np_pred_confidences, thr)
         ret = {
           'file' : fname,
@@ -131,15 +128,17 @@ def evaluate(H, valids, param_path, thr = 0.7, l = 60000, r = 120010, sep = 1000
 
       avg_time = (time.time() - t) / (i + 1)
       print('%f images/sec' % (1. / avg_time))
-      # with open(output_dir + 'result_' + str(iteration) + '.json', 'w') as f:
-      #   json.dump(rslt, f)
-      # batch_gen(output_dir + 'csv_' + str(iteration) + '.csv', output_dir + 'result_' + str(iteration) + '.json')
-      generate_result(TRUNK_DIR, rslt, output_dir + 'csv_' + str(iteration) + '.csv')
+      rrslt = []
+      for it in rslt:
+        it['box'] = filterBoxes(it['box'], 0.1)
+      with open(param_path + 'result_' + str(iteration) + '.json', 'w') as f:
+        json.dump(rslt, f)
+      generate_result(TRUNK_DIR, rslt, param_path + 'csv_' + str(iteration) + '.csv')
 
 def main():
   parser = argparse.ArgumentParser()
   parser.add_argument('--gpu', default=0)
-  parser.add_argument('--logdir', default='data/output')
+  parser.add_argument('--logdir', default='data/output.detection/')
   parser.add_argument('--tau', default=0.25, type=float)
   parser.add_argument('--subset', default=None, type=str)
   parser.add_argument('--left', default=60000, type=int)
@@ -149,11 +148,11 @@ def main():
   args = parser.parse_args()
   os.environ['CUDA_VISIBLE_DEVICES'] = str(args.gpu)
   output = 'subset' + args.subset
-  hypes_file = '%s/hypes.json' % (OUTPUT_DIR + output)
+  hypes_file = '%s/hypes.json' % (args.logdir + output)
   with open(hypes_file, 'r') as f:
     H = json.load(f)
     H['subset'] = 'subset' + args.subset
-    evaluate(H, META_DIR + output + '-scan.json', OUTPUT_DIR + output + '/', args.thr,
+    evaluate(H, META_DIR + output + '-scan.json', args.logdir + output + '/', args.thr,
         args.left, args.right, args.sep, with_anno = False)
 
 if __name__ == '__main__':

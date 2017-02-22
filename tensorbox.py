@@ -8,13 +8,11 @@ import string
 import argparse
 import os
 import threading
+import logging
 from scipy import misc
 import tensorflow as tf
 import numpy as np
-try:
-  from tensorflow.models.rnn import rnn_cell
-except ImportError:
-  rnn_cell = tf.nn.rnn_cell
+import tensorflow.contrib.rnn as rnn_cell
 from tensorflow.python.framework import ops
 from tensorflow.python.ops import array_ops
 
@@ -81,7 +79,7 @@ def rezoom(H, pred_boxes, early_feat, early_feat_channels, w_offsets, h_offsets)
                              early_feat_channels,
                              w_offset, h_offset))
 
-  interp_indices = tf.concat(0, indices)
+  interp_indices = tf.concat(axis=0, values=indices)
   rezoom_features = train_utils.interp(early_feat,
                      interp_indices,
                      early_feat_channels)
@@ -117,9 +115,9 @@ def build_forward(H, x, phase, reuse):
       cnn_s_pool = tf.nn.avg_pool(cnn_s[:, :, :, :256], ksize=[1, pool_size, pool_size, 1],
                     strides=[1, 1, 1, 1], padding='SAME')
 
-      cnn_s_with_pool = tf.concat(3, [cnn_s_pool, cnn_s[:, :, :, 256:]])
+      cnn_s_with_pool = tf.concat(axis=3, values=[cnn_s_pool, cnn_s[:, :, :, 256:]])
       cnn_deconv = deconv(cnn_s_with_pool, output_shape=[H['batch_size'], H['grid_height'], H['grid_width'], 256], channels=[H['later_feat_channels'], 256])
-      cnn = tf.concat(3, (cnn_deconv, cnn[:, :, :, 256:]))
+      cnn = tf.concat(axis=3, values = [cnn_deconv, cnn[:, :, :, 256:]])
 
   elif H['avg_pool_size'] > 1:
     pool_size = H['avg_pool_size']
@@ -127,7 +125,7 @@ def build_forward(H, x, phase, reuse):
     cnn2 = cnn[:, :, :, 400:]
     cnn2 = tf.nn.avg_pool(cnn2, ksize=[1, pool_size, pool_size, 1],
                 strides=[1, 1, 1, 1], padding='SAME')
-    cnn = tf.concat(3, [cnn1, cnn2])
+    cnn = tf.concat(axis=3, values=[cnn1, cnn2])
 
   cnn = tf.reshape(cnn,
            [H['batch_size'] * H['grid_width'] * H['grid_height'], H['later_feat_channels']])
@@ -158,8 +156,8 @@ def build_forward(H, x, phase, reuse):
       pred_logits.append(tf.reshape(tf.matmul(output, conf_weights),
                      [outer_size, 1, H['num_classes']]))
  
-    pred_boxes = tf.concat(1, pred_boxes)
-    pred_logits = tf.concat(1, pred_logits)
+    pred_boxes = tf.concat(axis=1, values=pred_boxes)
+    pred_logits = tf.concat(axis=1, values=pred_logits)
     pred_logits_squash = tf.reshape(pred_logits,
                     [outer_size * H['rnn_len'], H['num_classes']])
     pred_confidences_squash = tf.nn.softmax(pred_logits_squash)
@@ -176,7 +174,7 @@ def build_forward(H, x, phase, reuse):
       if phase == 'train':
         rezoom_features = tf.nn.dropout(rezoom_features, 0.5)
       for k in range(H['rnn_len']):
-        delta_features = tf.concat(1, [lstm_outputs[k], rezoom_features[:, k, :] / 1000.])
+        delta_features = tf.concat(axis=1, values=[lstm_outputs[k], rezoom_features[:, k, :] / 1000.])
         dim = 128
         delta_weights1 = tf.get_variable(
                   'delta_ip1%d' % k,
@@ -197,9 +195,9 @@ def build_forward(H, x, phase, reuse):
         scale = H.get('rezoom_conf_scale', 50) 
         pred_confs_deltas.append(tf.reshape(tf.matmul(ip1, delta_confs_weights) * scale,
                           [outer_size, 1, H['num_classes']]))
-      pred_confs_deltas = tf.concat(1, pred_confs_deltas)
+      pred_confs_deltas = tf.concat(axis=1, values=pred_confs_deltas)
       if H['reregress']:
-        pred_boxes_deltas = tf.concat(1, pred_boxes_deltas)
+        pred_boxes_deltas = tf.concat(axis=1, values=pred_boxes_deltas)
       return pred_boxes, pred_logits, pred_confidences, pred_confs_deltas, pred_boxes_deltas
 
   return pred_boxes, pred_logits, pred_confidences
@@ -233,7 +231,7 @@ def build_forward_backward(H, x, phase, boxes, flags):
     pred_logit_r = tf.reshape(pred_logits,
                   [outer_size * H['rnn_len'], H['num_classes']])
     confidences_loss = (tf.reduce_sum(
-      tf.nn.sparse_softmax_cross_entropy_with_logits(pred_logit_r, true_classes))
+      tf.nn.sparse_softmax_cross_entropy_with_logits(logits=pred_logit_r, labels=true_classes))
       ) / outer_size * H['solver']['head_weights'][0]
     residual = tf.reshape(perm_truth - pred_boxes * pred_mask,
                 [outer_size, H['rnn_len'], 4])
@@ -252,7 +250,7 @@ def build_forward_backward(H, x, phase, boxes, flags):
         inside = tf.reshape(tf.to_int64((tf.greater(classes, 0))), [-1])
       new_confs = tf.reshape(pred_confs_deltas, [outer_size * H['rnn_len'], H['num_classes']])
       delta_confs_loss = tf.reduce_sum(
-        tf.nn.sparse_softmax_cross_entropy_with_logits(new_confs, inside)) / outer_size * H['solver']['head_weights'][0] * 0.1
+        tf.nn.sparse_softmax_cross_entropy_with_logits(logits=new_confs, labels=inside)) / outer_size * H['solver']['head_weights'][0] * 0.1
 
       pred_logits_squash = tf.reshape(new_confs,
                       [outer_size * H['rnn_len'], H['num_classes']])
@@ -267,10 +265,10 @@ def build_forward_backward(H, x, phase, boxes, flags):
                  outer_size * H['solver']['head_weights'][1] * 0.03)
         boxes_loss = delta_boxes_loss
 
-        tf.histogram_summary(phase + '/delta_hist0_x', pred_boxes_deltas[:, 0, 0])
-        tf.histogram_summary(phase + '/delta_hist0_y', pred_boxes_deltas[:, 0, 1])
-        tf.histogram_summary(phase + '/delta_hist0_w', pred_boxes_deltas[:, 0, 2])
-        tf.histogram_summary(phase + '/delta_hist0_h', pred_boxes_deltas[:, 0, 3])
+        tf.summary.histogram(phase + '/delta_hist0_x', pred_boxes_deltas[:, 0, 0])
+        tf.summary.histogram(phase + '/delta_hist0_y', pred_boxes_deltas[:, 0, 1])
+        tf.summary.histogram(phase + '/delta_hist0_w', pred_boxes_deltas[:, 0, 2])
+        tf.summary.histogram(phase + '/delta_hist0_h', pred_boxes_deltas[:, 0, 3])
         loss += delta_boxes_loss
     else:
       loss = confidences_loss + boxes_loss
@@ -337,13 +335,13 @@ def build(H, q):
                       confidences_loss['test'], boxes_loss['test']])
 
       for p in ['train', 'test']:
-        tf.scalar_summary('%s/accuracy' % p, accuracy[p])
-        tf.scalar_summary('%s/accuracy/smooth' % p, moving_avg.average(accuracy[p]))
-        tf.scalar_summary("%s/confidences_loss" % p, confidences_loss[p])
-        tf.scalar_summary("%s/confidences_loss/smooth" % p,
+        tf.summary.scalar('%s/accuracy' % p, accuracy[p])
+        tf.summary.scalar('%s/accuracy/smooth' % p, moving_avg.average(accuracy[p]))
+        tf.summary.scalar("%s/confidences_loss" % p, confidences_loss[p])
+        tf.summary.scalar("%s/confidences_loss/smooth" % p,
           moving_avg.average(confidences_loss[p]))
-        tf.scalar_summary("%s/regression_loss" % p, boxes_loss[p])
-        tf.scalar_summary("%s/regression_loss/smooth" % p,
+        tf.summary.scalar("%s/regression_loss" % p, boxes_loss[p])
+        tf.summary.scalar("%s/regression_loss/smooth" % p,
           moving_avg.average(boxes_loss[p]))
 
     if phase == 'test':
@@ -373,17 +371,16 @@ def build(H, q):
       true_log_img = tf.py_func(log_image,
                     [test_image, test_true_confidences, test_true_boxes, global_step, 'true'],
                     [tf.float32])
-      tf.image_summary(phase + '/pred_boxes', tf.pack(pred_log_img),max_images=10)
-      tf.image_summary(phase + '/true_boxes', tf.pack(true_log_img),max_images=10)
+      tf.summary.image(phase + '/pred_boxes', tf.stack(pred_log_img),max_outputs=100)
+      tf.summary.image(phase + '/true_boxes', tf.stack(true_log_img),max_outputs=100)
 
-  summary_op = tf.merge_all_summaries()
+  summary_op = tf.summary.merge_all()
 
   return (config, loss, accuracy, summary_op, train_op,
       smooth_op, global_step, learning_rate)
 
 
 def train(H):
-
   if not os.path.exists(H['save_dir']):
     os.makedirs(H['save_dir'])
 
@@ -419,10 +416,11 @@ def train(H):
    smooth_op, global_step, learning_rate) = build(H, q)
 
   saver = tf.train.Saver(max_to_keep=None)
-  writer = tf.train.SummaryWriter(
+  writer = tf.summary.FileWriter(
     logdir=H['save_dir'],
     flush_secs=10
   )
+  logging.basicConfig(format='%(asctime)s %(message)s', datefmt='%m/%d/%Y %I:%M:%S %p', level=logging.DEBUG)
 
   with tf.Session(config=config) as sess:
     tf.train.start_queue_runners(sess=sess)
@@ -437,27 +435,26 @@ def train(H):
       t.start()
 
     tf.set_random_seed(H['solver']['rnd_seed'])
-    sess.run(tf.initialize_all_variables())
+    sess.run(tf.global_variables_initializer())
     writer.add_graph(sess.graph)
     weights_str = H['solver']['weights']
     if len(weights_str) > 0:
-      print('Restoring from: %s' % weights_str)
+      logging.info('Restoring from: %s' % weights_str)
       saver.restore(sess, weights_str)
     else:
       init_fn = slim.assign_from_checkpoint_fn(
           '%s/data/inception_v1.ckpt' % os.path.dirname(os.path.realpath(__file__)),
-          [x for x in tf.all_variables() if x.name.startswith('InceptionV1') and not H['solver']['opt'] in x.name])
+          [x for x in tf.global_variables() if x.name.startswith('InceptionV1') and not H['solver']['opt'] in x.name])
       init_fn(sess)
 
     # train model for N iterations
     start = time.time()
-    max_iter = H['solver'].get('max_iter', 10000000)
+    max_iter = H['solver'].get('max_iter', 120010)
     for i in xrange(max_iter):
       display_iter = H['logging']['display_iter']
       adjusted_lr = (H['solver']['learning_rate'] *
                0.5 ** max(0, (i / H['solver']['learning_rate_step']) - 2))
       lr_feed = {learning_rate: adjusted_lr}
-
       if i % display_iter != 0:
         # train network
         batch_loss_train, _ = sess.run([loss['train'], train_op], feed_dict=lr_feed)
@@ -478,7 +475,7 @@ def train(H):
           'Softmax Test Accuracy: %.5f%%',
           'Time/image (ms): %.1f'
         ], ', ')
-        print(print_str %
+        logging.info(print_str %
             (i, adjusted_lr, train_loss,
              test_accuracy * 100, dt * 1000 if i > 0 else 0))
 
@@ -525,6 +522,7 @@ def main():
   if len(H.get('exp_name', '')) == 0:
     H['exp_name'] = args.hypes.split('/')[-1].replace('.json', '')
   H['save_dir'] = args.logdir + '/subset' + args.subset
+  H['subset'] = args.subset
   if args.weights is not None:
     H['solver']['weights'] = args.weights
   train(H)

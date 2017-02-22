@@ -2,9 +2,9 @@
 # @Author: yancz1989
 # @Date:   2017-01-17 23:43:18
 # @Last Modified by:   yancz1989
-# @Last Modified time: 2017-01-23 01:30:36
+# @Last Modified time: 2017-02-22 20:33:29
 import utilities as util
-from utilities import parse_image_file, filterBoxes, voxel_2_world
+from utilities import parse_image_file, filterBoxes, voxel_2_world, mkdir
 import numpy as np
 import os
 import json
@@ -17,6 +17,7 @@ def generate_scan_image(subset):
   list_dirs = os.walk(TRUNK_DIR + subset)
   jsobjs = []
   output_dir = SAMPLE_DIR + subset
+  mkdir(output_dir)
   for root, dirs, files in list_dirs:
     for f in files:
       if f.lower().endswith('mhd'):

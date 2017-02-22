@@ -38,11 +38,11 @@ def generate_data(data_root, data_map, fp_dir):
             worldCoord, label = it
             voxelCoord = util.worldToVoxelCoord(worldCoord, numpyOrigin, numpySpacing)
             voxelWidth = 65
-            x = voxelCoord[1]
-            y = voxelCoord[2]
+            x = int(voxelCoord[1])
+            y = int(voxelCoord[2])
             z = int(voxelCoord[0])
-            patch = numpyImage[z, x - voxelWidth / 2:x + voxelWidth / 2,
-                                  y - voxelWidth / 2:y + voxelWidth / 2]
+            patch = numpyImage[z, x - voxelWidth // 2:x + voxelWidth // 2,
+                                  y - voxelWidth // 2:y + voxelWidth // 2]
             patch = util.normalizePlanes(patch)
             if patch.size == 0:
               continue
@@ -57,8 +57,8 @@ def generate_data(data_root, data_map, fp_dir):
                 dx, dy = MOV_LIST[i % 8]
                 xx = x + int(dx * np.random.rand())
                 yy = y + int(dy * np.random.rand())
-                aug_patch = numpyImage[z, xx - voxelWidth / 2:xx + voxelWidth / 2,
-                                       yy - voxelWidth / 2:yy + voxelWidth / 2]
+                aug_patch = numpyImage[z, xx - voxelWidth // 2:xx + voxelWidth // 2,
+                                       yy - voxelWidth // 2:yy + voxelWidth // 2]
                 aug_patch = util.normalizePlanes(aug_patch)
                 if aug_patch.size == 0:
                   continue
