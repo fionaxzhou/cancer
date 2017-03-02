@@ -68,6 +68,70 @@ def get_img_mask(scan, h, nodules, nth=-1, z=None):
         res[rr,cc] = 1;
     return img,res;
 
+def segment_lung_mask2(image, fill_lung_structures=True, speedup=4):    
+    def largest_label_volume(im, bg=-1):
+        vals, counts = np.unique(im, return_counts=True)
+
+        counts = counts[vals != bg]
+        vals = vals[vals != bg]
+
+        if len(counts) > 0:
+            return vals[np.argmax(counts)]
+        else:
+            return None
+    
+    if speedup>1:
+        smallImage = transform.downscale_local_mean(image,(1,speedup,speedup));
+    else:
+        smallImage = image;
+    # not actually binary, but 1 and 2. 
+    # 0 is treated as background, which we do not want
+    binary_image = np.array(smallImage > -320, dtype=np.int8)+1
+    labels = measure.label(binary_image)
+    
+    # Pick the pixel in the very corner to determine which label is air.
+    #   Improvement: Pick multiple background labels from around the patient
+    #   More resistant to "trays" on which the patient lays cutting the air 
+    #   around the person in half
+    background_label = np.median([labels[0,0,0],labels[-1,-1,-1],labels[0,-1,-1],
+        labels[0,0,-1],labels[0,-1,0],labels[-1,0,0],labels[-1,0,-1]]);
+
+    #Fill the air around the person
+    binary_image[background_label == labels] = 2
+       
+    # Method of filling the lung structures (that is superior to something like 
+    # morphological closing)
+    if fill_lung_structures:
+        # For every slice we determine the largest solid structure
+        for i, axial_slice in enumerate(binary_image):
+            axial_slice = axial_slice - 1
+            labeling = measure.label(axial_slice)
+            l_max = largest_label_volume(labeling, bg=0)
+            
+            if l_max is not None: #This slice contains some lung
+                binary_image[i][labeling != l_max] = 1
+
+    binary_image -= 1 #Make the image actual binary
+    binary_image = 1-binary_image # Invert it, lungs are now 1
+    
+    # Remove other air pockets insided body
+    labels = measure.label(binary_image, background=0)
+    m = labels.shape[0]//2;
+    l_max = largest_label_volume(labels[m-12:m+20:4,:,:], bg=0)
+    if l_max is not None: # There are air pockets
+        binary_image[labels != l_max] = 0
+    
+    if speedup<=1:
+        return binary_image
+    else:
+        res = np.zeros(image.shape,dtype=np.uint8);
+        for i,x in enumerate(binary_image):
+            y = transform.resize(x*1.0,image.shape[1:3]);
+            res[i][y>0.5]=1
+            #res[i] = binary_dilation(res[i],disk(4))
+            #res[i] = binary_erosion(res[i],disk(4))
+        return res;
+
 def segment_lung_mask(image, speedup=4):
     def largest_label_volume(im, bg=-1):
         vals, counts = np.unique(im, return_counts=True)

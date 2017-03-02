@@ -1,6 +1,8 @@
 import sys
 import os
-
+#val loss = -0.731
+tag = 3
+net_version = 1
 ## -------------------------------------------------
 ## ---- data files ----
 ## -------------------------------------------------
@@ -21,7 +23,7 @@ for d in [cache_dir,params_dir, res_dir, log_dir]:
 #sample
 unlabelled_ratio = 0.5;
 fitter = dict(
-    batch_size = 12,
+    batch_size = 8,
     num_epochs = 40,
     NCV = 5,
     folds = [0], #fold == NCV means to use all data
@@ -30,7 +32,8 @@ fitter = dict(
 );
 #loss function paramters
 smooth = 5;
-pred_loss_mul = 0.5;
+pred_loss_mul = 0.6;
+p_ave = 0.8;
 
 #fitter = dict(
 #    batch_size = 6,
@@ -58,7 +61,7 @@ aug = dict(
 	 featurewise_std_normalization=False,
 	 samplewise_std_normalization=False,
 	 zca_whitening=False,
-	 rotation_range=15.0,
+	 rotation_range=10.0,
 	 width_shift_range=0.20,
 	 height_shift_range=0.20,
 	 shear_range=0.05,
