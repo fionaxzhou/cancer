@@ -2,7 +2,7 @@
 # @Author: yancz1989
 # @Date:   2017-02-03 16:18:59
 # @Last Modified by:   yancz1989
-# @Last Modified time: 2017-02-22 23:34:18
+# @Last Modified time: 2017-02-23 00:17:49
 
 import tensorflow as tf
 import numpy as np
@@ -73,7 +73,8 @@ def build(H, dat, sess):
   opts = {
       'RMS': tf.train.RMSPropOptimizer,
       'Adam': tf.train.AdamOptimizer,
-      'SGD': tf.train.GradientDescentOptimizer
+      'SGD': tf.train.GradientDescentOptimizer,
+      'Adagrad': tf.train.AdagradOptimizer
     }
   opt = opts[H['opt']](learning_rate = H['lr'])
   grads_vars = opt.compute_gradients(loss, varst)
@@ -142,7 +143,7 @@ def train(args):
         if step % 100 == 0:
           cnt = (step * bsize)
           logstr = ('Training batchs %d, avg loss %f, acc %f, FN %d/%d, FP %d/%d.' %
-            (step, tol_loss / step, (cnt - tol_acc) / cnt, tol_tfn, P, tol_tfp, N))
+            (step, tol_loss / step, (cnt - tol_acc) / cnt, tol_tfn, P - tol_tfn, tol_tfp, N - tol_tfp))
           print(logstr)
           logging.info(logstr)
 
